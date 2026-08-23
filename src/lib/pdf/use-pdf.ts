@@ -10,7 +10,7 @@ import {
   formatMarathiAmountInWords,
   toDevanagariDigits,
 } from "@/lib/pdf/marathi-format"
-import type { PrintConfig } from "@/types"
+import type { PrintConfig, PrintFieldPosition } from "@/types"
 import "@/lib/pdf/sarai-font"
 
 interface ReceiptData {
@@ -23,11 +23,10 @@ interface ReceiptData {
 }
 
 const FONT_SIZE_PT = 14
-// Donor name gets a small size bump plus faux-bold, in both the Latin
-// (vector) and Devanagari (canvas) rendering paths — Sarai_07 only has a
-// normal-weight face, so "bold" here means synthesized emphasis, not a
-// separate bold font file.
-const NAME_FONT_SIZE_PT = FONT_SIZE_PT + 2
+// Faux-bold stroke width for the vector path — Sarai_07 only has a
+// normal-weight face registered (see comment below), so every field's own
+// `bold` toggle is synthesized rather than a real bold font file.
+const BOLD_STROKE_WIDTH_IN = 0.006
 
 export function usePdf() {
   const storePrintConfig = useAppStore((s) => s.printConfig)
@@ -57,56 +56,62 @@ export function usePdf() {
       // so keep every call pinned to "normal" to actually use the embedded font.
       doc.setFont("Sarai_07", "normal")
 
-      // Draw text with jsPDF's plain vector renderer — fine for receiptNo/date/
-      // amount, which are always Latin/numeric.
-      const drawVectorText = (text: string, x: number, y: number) => doc.text(text, x, y)
+      // Draw text with jsPDF's plain vector renderer, sized/weighted per that
+      // field's own printConfig entry. jsPDF has no bold face registered for
+      // Sarai_07 (requesting "bold" would silently fall back to
+      // Times-Roman, breaking Devanagari) — so `bold` is faked by stroking
+      // the glyph outlines on top of the fill instead of a real bold font.
+      const drawVectorField = (field: PrintFieldPosition, text: string) => {
+        doc.setFontSize(field.fontSize)
+        if (field.bold) {
+          doc.setLineWidth(BOLD_STROKE_WIDTH_IN)
+          doc.setDrawColor(0, 0, 0)
+          doc.text(text, field.x, field.y, { renderingMode: "fillThenStroke" })
+        } else {
+          doc.text(text, field.x, field.y)
+        }
+      }
 
       // Draw text via an offscreen canvas instead: the browser's own text
       // engine shapes Devanagari conjuncts/matras correctly (jsPDF's doc.text
       // does a naive 1:1 glyph lookup and can't). Anchors at the same
-      // baseline point a doc.text() call would have used.
-      const drawShapedText = async (text: string, x: number, y: number) => {
-        const rendered = await renderDevanagariText(text, FONT_SIZE_PT)
-        doc.addImage(rendered.dataUrl, "PNG", x, y - rendered.baselineOffsetIn, rendered.widthIn, rendered.heightIn)
+      // baseline point a doc.text() call would have used. Canvas synthesizes
+      // its own faux-bold when `bold` is set, same reasoning as above.
+      const drawShapedField = async (field: PrintFieldPosition, text: string) => {
+        const rendered = await renderDevanagariText(text, field.fontSize, { bold: field.bold })
+        doc.addImage(
+          rendered.dataUrl,
+          "PNG",
+          field.x,
+          field.y - rendered.baselineOffsetIn,
+          rendered.widthIn,
+          rendered.heightIn
+        )
       }
 
-      const drawText = devanagariMode ? drawShapedText : drawVectorText
+      const drawField = (field: PrintFieldPosition, text: string) =>
+        devanagariMode ? drawShapedField(field, text) : drawVectorField(field, text)
 
-      // Bold+bumped variant used only for the donor name. jsPDF has no bold
-      // face registered for Sarai_07 (requesting "bold" would silently fall
-      // back to Times-Roman, breaking Devanagari) — so the vector path fakes
-      // bold by stroking the glyph outlines on top of the fill instead.
-      const drawBoldVectorText = (text: string, x: number, y: number) => {
-        doc.setFontSize(NAME_FONT_SIZE_PT)
-        doc.setLineWidth(0.006)
-        doc.setDrawColor(0, 0, 0)
-        doc.text(text, x, y, { renderingMode: "fillThenStroke" })
-        doc.setFontSize(FONT_SIZE_PT)
-      }
-      const drawBoldShapedText = async (text: string, x: number, y: number) => {
-        const rendered = await renderDevanagariText(text, NAME_FONT_SIZE_PT, { bold: true })
-        doc.addImage(rendered.dataUrl, "PNG", x, y - rendered.baselineOffsetIn, rendered.widthIn, rendered.heightIn)
-      }
-      const drawBoldText = devanagariMode ? drawBoldShapedText : drawBoldVectorText
-
-      // Receipt number stays a plain Latin/ASCII reference ID either way — it
-      // has to keep matching what's searchable in Payment History and the DB.
-      doc.text(data.receiptNo, receiptNo.x, receiptNo.y)
+      // Receipt number stays on the vector path unconditionally — it's
+      // always a plain Latin/ASCII reference ID and has to keep matching
+      // what's searchable in Payment History and the DB, so it never needs
+      // Devanagari shaping even when the rest of the receipt does.
+      drawVectorField(receiptNo, data.receiptNo)
 
       const dateText = devanagariMode ? toDevanagariDigits(data.date) : data.date
-      await drawText(dateText, date.x, date.y)
+      await drawField(date, dateText)
 
-      await drawBoldText(data.name, name.x, name.y)
+      await drawField(name, data.name)
 
       if (data.payment === "Other") {
         const donationPrefix = devanagariMode ? "देणगी: " : "Donation: "
-        await drawText(donationPrefix + data.otherDonation, amount.x, amount.y)
+        await drawField(amount, donationPrefix + data.otherDonation)
       } else if (devanagariMode) {
-        await drawText(formatMarathiAmount(data.amount), amount.x, amount.y)
-        await drawText(formatMarathiAmountInWords(data.amount), amtText.x, amtText.y)
+        await drawField(amount, formatMarathiAmount(data.amount))
+        await drawField(amtText, formatMarathiAmountInWords(data.amount))
       } else {
-        doc.text("Rs. " + data.amount.toFixed(2).toString() + " Only", amount.x, amount.y)
-        doc.text(data.numInWords + "Rupees Only", amtText.x, amtText.y)
+        await drawField(amount, "Rs. " + data.amount.toFixed(2).toString() + " Only")
+        await drawField(amtText, data.numInWords + "Rupees Only")
       }
 
       doc.save(data.receiptNo + "_Receipt.pdf")

@@ -5,6 +5,7 @@ import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
+import { Switch } from "@/components/ui/switch"
 import { usePdf } from "@/lib/pdf/use-pdf"
 import { savePrintConfig } from "@/services/printConfigService"
 import { useAppStore } from "@/store/useAppStore"
@@ -86,40 +87,68 @@ export default function PrintConfigPage() {
         <CardHeader>
           <CardTitle className="font-display text-xl">Receipt print configuration</CardTitle>
           <CardDescription>
-            Tune where each field prints on the physical receipt template, in inches from the top-left corner.
+            Tune where each field prints on the physical receipt template (inches from the top-left corner), plus
+            its font size and bold weight.
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-6">
           {FIELD_LABELS.map(({ key, label }) => (
-            <div key={key} className="grid gap-4 sm:grid-cols-2">
-              <div className="space-y-1.5">
-                <Label>{label} Horizontal</Label>
-                <div className="relative">
-                  <Input
-                    type="number"
-                    step="0.01"
-                    value={form[key].x}
-                    onChange={(e) => changehandler(key, "x", e.target.value)}
-                    className="pr-12"
-                  />
-                  <span className="pointer-events-none absolute top-1/2 right-3 -translate-y-1/2 text-xs text-muted-foreground">
-                    inch
-                  </span>
+            <div key={key} className="space-y-3 rounded-lg border p-4">
+              <p className="text-sm font-medium">{label}</p>
+              <div className="grid gap-4 sm:grid-cols-2">
+                <div className="space-y-1.5">
+                  <Label>Horizontal</Label>
+                  <div className="relative">
+                    <Input
+                      type="number"
+                      step="0.01"
+                      value={form[key].x}
+                      onChange={(e) => changehandler(key, "x", e.target.value)}
+                      className="pr-12"
+                    />
+                    <span className="pointer-events-none absolute top-1/2 right-3 -translate-y-1/2 text-xs text-muted-foreground">
+                      inch
+                    </span>
+                  </div>
                 </div>
-              </div>
-              <div className="space-y-1.5">
-                <Label>{label} Vertical</Label>
-                <div className="relative">
-                  <Input
-                    type="number"
-                    step="0.01"
-                    value={form[key].y}
-                    onChange={(e) => changehandler(key, "y", e.target.value)}
-                    className="pr-12"
+                <div className="space-y-1.5">
+                  <Label>Vertical</Label>
+                  <div className="relative">
+                    <Input
+                      type="number"
+                      step="0.01"
+                      value={form[key].y}
+                      onChange={(e) => changehandler(key, "y", e.target.value)}
+                      className="pr-12"
+                    />
+                    <span className="pointer-events-none absolute top-1/2 right-3 -translate-y-1/2 text-xs text-muted-foreground">
+                      inch
+                    </span>
+                  </div>
+                </div>
+                <div className="space-y-1.5">
+                  <Label>Font size</Label>
+                  <div className="relative">
+                    <Input
+                      type="number"
+                      step="1"
+                      min="1"
+                      value={form[key].fontSize}
+                      onChange={(e) => changehandler(key, "fontSize", e.target.value)}
+                      className="pr-8"
+                    />
+                    <span className="pointer-events-none absolute top-1/2 right-3 -translate-y-1/2 text-xs text-muted-foreground">
+                      pt
+                    </span>
+                  </div>
+                </div>
+                <div className="flex items-end justify-between gap-2 pb-1.5">
+                  <Label htmlFor={`${key}-bold`}>Bold</Label>
+                  <Switch
+                    id={`${key}-bold`}
+                    checked={form[key].bold}
+                    onCheckedChange={(checked) => changehandler(key, "bold", checked)}
                   />
-                  <span className="pointer-events-none absolute top-1/2 right-3 -translate-y-1/2 text-xs text-muted-foreground">
-                    inch
-                  </span>
                 </div>
               </div>
             </div>

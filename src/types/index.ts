@@ -42,6 +42,8 @@ export interface ExpenseDraft {
 export interface PrintFieldPosition {
   x: number
   y: number
+  fontSize: number
+  bold: boolean
 }
 
 export interface PrintConfig {

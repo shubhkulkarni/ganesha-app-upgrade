@@ -6,6 +6,7 @@ import { Loader } from "@/components/loader"
 import { AppShell } from "@/components/layout/AppShell"
 import { auth } from "@/lib/firebase"
 import { loadPrintConfig } from "@/services/printConfigService"
+import { mergePrintConfigDefaults } from "@/lib/pdf/print-config-defaults"
 import { useAppStore } from "@/store/useAppStore"
 
 const LoginPage = lazy(() => import("@/pages/login/LoginPage"))
@@ -45,7 +46,7 @@ export function AppRouter() {
       .catch(() => {
         const cached = localStorage.getItem(PRINT_CONFIG_STORAGE_KEY)
         if (cached) {
-          setPrintConfig(JSON.parse(cached))
+          setPrintConfig(mergePrintConfigDefaults(JSON.parse(cached)))
         } else {
           toast.error("Error loading print config. Refresh the page to try again")
         }

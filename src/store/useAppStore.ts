@@ -1,13 +1,6 @@
 import { create } from "zustand"
+import { DEFAULT_PRINT_CONFIG } from "@/lib/pdf/print-config-defaults"
 import type { PrintConfig } from "@/types"
-
-const DEFAULT_PRINT_CONFIG: PrintConfig = {
-  name: { x: 2.4, y: 2.67 },
-  amount: { x: 2.4, y: 3.07 },
-  date: { x: 5.8, y: 2.3 },
-  amtText: { x: 2.4, y: 3.47 },
-  receiptNo: { x: 2.4, y: 2.3 },
-}
 
 /**
  * Firebase restores the signed-in session asynchronously (it reads IndexedDB),

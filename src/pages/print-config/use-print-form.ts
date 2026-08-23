@@ -17,11 +17,14 @@ export function usePrintForm(initial: PrintConfig) {
   }, [initial, isFormChanged])
 
   const changehandler = useCallback(
-    (key: keyof PrintConfig, subkey: keyof PrintFieldPosition, value: string) => {
+    (key: keyof PrintConfig, subkey: keyof PrintFieldPosition, value: string | number | boolean) => {
       setIsFormChanged(true)
       setForm((prev) => ({
         ...prev,
-        [key]: { ...prev[key], [subkey]: Number(value) },
+        [key]: {
+          ...prev[key],
+          [subkey]: subkey === "bold" ? Boolean(value) : Number(value),
+        },
       }))
     },
     []
