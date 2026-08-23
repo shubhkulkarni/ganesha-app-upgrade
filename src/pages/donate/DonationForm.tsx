@@ -19,7 +19,9 @@ import {
   FormLabel,
   FormMessage,
 } from "@/components/ui/form"
+import { VoiceInputButton } from "@/components/voice-input-button"
 import { cn } from "@/lib/utils"
+import { AMOUNT_PRESETS } from "./amount-presets"
 import type { DonationFormValues } from "./schema"
 
 interface DonationFormProps {
@@ -80,7 +82,14 @@ export function DonationForm({ form }: DonationFormProps) {
           <FormItem className="sm:col-span-2">
             <FormLabel>Name</FormLabel>
             <FormControl>
-              <Input {...field} />
+              <div className="relative">
+                <Input className="pr-16" {...field} />
+                <VoiceInputButton
+                  value={field.value}
+                  onChange={(text) => field.onChange(text)}
+                  className="absolute top-1/2 right-2 -translate-y-1/2"
+                />
+              </div>
             </FormControl>
             <FormMessage />
           </FormItem>
@@ -134,6 +143,8 @@ export function DonationForm({ form }: DonationFormProps) {
         )}
       />
 
+      {!isGoodsMode && <AmountPresets form={form} />}
+
       <FormField
         control={form.control}
         name="payment"
@@ -157,6 +168,32 @@ export function DonationForm({ form }: DonationFormProps) {
           </FormItem>
         )}
       />
+    </div>
+  )
+}
+
+/** Rendered as its own full-width row below Amount/Contact (not nested
+ * inside the Amount FormField) so Amount and Contact stay the same shape
+ * and stay aligned — nesting the presets under Amount previously made it
+ * taller than Contact and threw the row out of alignment. */
+function AmountPresets({ form }: DonationFormProps) {
+  const amount = form.watch("amount")
+
+  return (
+    <div className="flex flex-wrap gap-1.5 sm:col-span-2">
+      {AMOUNT_PRESETS.map((preset) => (
+        <button
+          key={preset}
+          type="button"
+          onClick={() => form.setValue("amount", String(preset), { shouldValidate: true })}
+          className={cn(
+            "rounded-full border px-2.5 py-0.5 text-xs font-medium transition-colors hover:bg-accent",
+            amount === String(preset) && "border-primary bg-primary/10 text-primary"
+          )}
+        >
+          ₹{preset}
+        </button>
+      ))}
     </div>
   )
 }

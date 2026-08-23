@@ -23,6 +23,11 @@ interface ReceiptData {
 }
 
 const FONT_SIZE_PT = 14
+// Donor name gets a small size bump plus faux-bold, in both the Latin
+// (vector) and Devanagari (canvas) rendering paths — Sarai_07 only has a
+// normal-weight face, so "bold" here means synthesized emphasis, not a
+// separate bold font file.
+const NAME_FONT_SIZE_PT = FONT_SIZE_PT + 2
 
 export function usePdf() {
   const storePrintConfig = useAppStore((s) => s.printConfig)
@@ -67,6 +72,23 @@ export function usePdf() {
 
       const drawText = devanagariMode ? drawShapedText : drawVectorText
 
+      // Bold+bumped variant used only for the donor name. jsPDF has no bold
+      // face registered for Sarai_07 (requesting "bold" would silently fall
+      // back to Times-Roman, breaking Devanagari) — so the vector path fakes
+      // bold by stroking the glyph outlines on top of the fill instead.
+      const drawBoldVectorText = (text: string, x: number, y: number) => {
+        doc.setFontSize(NAME_FONT_SIZE_PT)
+        doc.setLineWidth(0.006)
+        doc.setDrawColor(0, 0, 0)
+        doc.text(text, x, y, { renderingMode: "fillThenStroke" })
+        doc.setFontSize(FONT_SIZE_PT)
+      }
+      const drawBoldShapedText = async (text: string, x: number, y: number) => {
+        const rendered = await renderDevanagariText(text, NAME_FONT_SIZE_PT, { bold: true })
+        doc.addImage(rendered.dataUrl, "PNG", x, y - rendered.baselineOffsetIn, rendered.widthIn, rendered.heightIn)
+      }
+      const drawBoldText = devanagariMode ? drawBoldShapedText : drawBoldVectorText
+
       // Receipt number stays a plain Latin/ASCII reference ID either way — it
       // has to keep matching what's searchable in Payment History and the DB.
       doc.text(data.receiptNo, receiptNo.x, receiptNo.y)
@@ -74,7 +96,7 @@ export function usePdf() {
       const dateText = devanagariMode ? toDevanagariDigits(data.date) : data.date
       await drawText(dateText, date.x, date.y)
 
-      await drawText(data.name, name.x, name.y)
+      await drawBoldText(data.name, name.x, name.y)
 
       if (data.payment === "Other") {
         const donationPrefix = devanagariMode ? "देणगी: " : "Donation: "

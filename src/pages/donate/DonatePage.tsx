@@ -17,14 +17,20 @@ import { DonationForm } from "./DonationForm"
 import { RecentDonationsList } from "./RecentDonationsList"
 import { donationSchema, getReceiptNo, type DonationFormValues } from "./schema"
 
-const emptyValues = (receiptNo: string): DonationFormValues => ({
+// `payment` defaults to whatever was just used instead of always blank —
+// during a busy stretch a volunteer re-entering the same mode (usually
+// Cash) shouldn't have to re-pick it on every single entry.
+const emptyValues = (
+  receiptNo: string,
+  payment: DonationFormValues["payment"] = "" as DonationFormValues["payment"]
+): DonationFormValues => ({
   receiptNo,
   date: new Date(),
   name: "",
   amount: "",
   otherDonation: "",
   mobile: "",
-  payment: "" as DonationFormValues["payment"],
+  payment,
 })
 
 export default function DonatePage() {
@@ -68,7 +74,8 @@ export default function DonatePage() {
       generatePdf(savedRecord)
 
       toast.success("Your donation is successful !")
-      form.reset(emptyValues(getReceiptNo({ receiptNo: values.receiptNo })))
+      form.reset(emptyValues(getReceiptNo({ receiptNo: values.receiptNo }), values.payment))
+      form.setFocus("name")
     } catch (err) {
       toast.error(err instanceof Error ? err.message : "Something went wrong")
     }
@@ -113,7 +120,9 @@ export default function DonatePage() {
                     <Button
                       type="button"
                       variant="outline"
-                      onClick={() => form.reset(emptyValues(form.getValues("receiptNo")))}
+                      onClick={() =>
+                        form.reset(emptyValues(form.getValues("receiptNo"), form.getValues("payment")))
+                      }
                     >
                       Reset
                     </Button>

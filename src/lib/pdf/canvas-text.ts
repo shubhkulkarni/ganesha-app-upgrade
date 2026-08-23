@@ -38,11 +38,18 @@ export interface CanvasTextResult {
 /** Renders `text` to an offscreen canvas using the (correctly shaping) browser
  * text engine, returning a PNG data URL sized and positioned to drop in for
  * an equivalent `doc.text(text, x, y)` call at the same point size. */
-export async function renderDevanagariText(text: string, fontSizePt: number): Promise<CanvasTextResult> {
+export async function renderDevanagariText(
+  text: string,
+  fontSizePt: number,
+  options: { bold?: boolean } = {}
+): Promise<CanvasTextResult> {
   await loadCanvasFont()
 
   const fontSizePx = (fontSizePt / 72) * RENDER_PPI
-  const fontSpec = `${fontSizePx}px "${CANVAS_FONT_FAMILY}"`
+  // Sarai_07 only has a normal-weight face registered — the browser's canvas
+  // engine synthesizes ("faux") bold from it when asked for a bold weight,
+  // the same way it would for any web font missing a bold variant.
+  const fontSpec = `${options.bold ? "bold " : ""}${fontSizePx}px "${CANVAS_FONT_FAMILY}"`
 
   const measureCanvas = document.createElement("canvas")
   const measureCtx = measureCanvas.getContext("2d")
