@@ -3,7 +3,7 @@ import jsPDF from "jspdf"
 import { toast } from "sonner"
 import { formattedDate, numToWords } from "@/lib/format"
 import { useAppStore } from "@/store/useAppStore"
-import { renderDevanagariText } from "@/lib/pdf/canvas-text"
+import { type CanvasFontSources, renderDevanagariText } from "@/lib/pdf/canvas-text"
 import {
   containsDevanagari,
   formatMarathiAmount,
@@ -11,7 +11,7 @@ import {
   toDevanagariDigits,
 } from "@/lib/pdf/marathi-format"
 import type { PrintConfig, PrintFieldPosition } from "@/types"
-import "@/lib/pdf/sarai-font"
+import "@/lib/pdf/mukta-font"
 
 interface ReceiptData {
   receiptNo: string
@@ -23,10 +23,10 @@ interface ReceiptData {
 }
 
 const FONT_SIZE_PT = 14
-// Faux-bold stroke width for the vector path — Sarai_07 only has a
-// normal-weight face registered (see comment below), so every field's own
-// `bold` toggle is synthesized rather than a real bold font file.
-const BOLD_STROKE_WIDTH_IN = 0.006
+
+type PdfWithVfs = jsPDF & {
+  getFileFromVFS?: (fileName: string) => string
+}
 
 export function usePdf() {
   const storePrintConfig = useAppStore((s) => s.printConfig)
@@ -50,35 +50,36 @@ export function usePdf() {
 
       const doc = new jsPDF({ orientation: "portrait", unit: "in", format: "a4" })
       doc.setFontSize(FONT_SIZE_PT)
-      // Sarai_07 is only registered under the "normal" style (see sarai-font.js).
-      // Requesting "400"/"bold" doesn't match that registration and makes jsPDF
-      // silently fall back to Times-Roman, which can't render Devanagari glyphs —
-      // so keep every call pinned to "normal" to actually use the embedded font.
-      doc.setFont("Sarai_07", "normal")
+      doc.setFont("Mukta", "normal")
+      const pdfWithVfs = doc as PdfWithVfs
+      let canvasFonts: CanvasFontSources | null = null
+
+      const getCanvasFonts = (): CanvasFontSources => {
+        if (!canvasFonts) {
+          const regular = pdfWithVfs.getFileFromVFS?.("Mukta-Regular.ttf")
+          const bold = pdfWithVfs.getFileFromVFS?.("Mukta-Bold.ttf")
+          if (!regular || !bold) {
+            throw new Error("Mukta font data is not available in jsPDF VFS")
+          }
+          canvasFonts = { regular, bold }
+        }
+        return canvasFonts
+      }
 
       // Draw text with jsPDF's plain vector renderer, sized/weighted per that
-      // field's own printConfig entry. jsPDF has no bold face registered for
-      // Sarai_07 (requesting "bold" would silently fall back to
-      // Times-Roman, breaking Devanagari) — so `bold` is faked by stroking
-      // the glyph outlines on top of the fill instead of a real bold font.
+      // field's own printConfig entry.
       const drawVectorField = (field: PrintFieldPosition, text: string) => {
+        doc.setFont("Mukta", field.bold ? "bold" : "normal")
         doc.setFontSize(field.fontSize)
-        if (field.bold) {
-          doc.setLineWidth(BOLD_STROKE_WIDTH_IN)
-          doc.setDrawColor(0, 0, 0)
-          doc.text(text, field.x, field.y, { renderingMode: "fillThenStroke" })
-        } else {
-          doc.text(text, field.x, field.y)
-        }
+        doc.text(text, field.x, field.y)
       }
 
       // Draw text via an offscreen canvas instead: the browser's own text
       // engine shapes Devanagari conjuncts/matras correctly (jsPDF's doc.text
       // does a naive 1:1 glyph lookup and can't). Anchors at the same
-      // baseline point a doc.text() call would have used. Canvas synthesizes
-      // its own faux-bold when `bold` is set, same reasoning as above.
+      // baseline point a doc.text() call would have used.
       const drawShapedField = async (field: PrintFieldPosition, text: string) => {
-        const rendered = await renderDevanagariText(text, field.fontSize, { bold: field.bold })
+        const rendered = await renderDevanagariText(text, field.fontSize, { bold: field.bold }, getCanvasFonts())
         doc.addImage(
           rendered.dataUrl,
           "PNG",
