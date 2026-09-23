@@ -17,20 +17,14 @@ import { DonationForm } from "./DonationForm"
 import { RecentDonationsList } from "./RecentDonationsList"
 import { donationSchema, getReceiptNo, type DonationFormValues } from "./schema"
 
-// `payment` defaults to whatever was just used instead of always blank —
-// during a busy stretch a volunteer re-entering the same mode (usually
-// Cash) shouldn't have to re-pick it on every single entry.
-const emptyValues = (
-  receiptNo: string,
-  payment: DonationFormValues["payment"] = "" as DonationFormValues["payment"]
-): DonationFormValues => ({
+const emptyValues = (receiptNo: string): DonationFormValues => ({
   receiptNo,
   date: new Date(),
   name: "",
   amount: "",
   otherDonation: "",
   mobile: "",
-  payment,
+  payment: "" as DonationFormValues["payment"],
 })
 
 export default function DonatePage() {
@@ -70,11 +64,10 @@ export default function DonatePage() {
       await createDonation(savedRecord)
       await queryClient.invalidateQueries({ queryKey: ["payments", yearKey] })
 
-      // Generate the receipt from the record that was actually saved, not stale pre-submit state.
       generatePdf(savedRecord)
 
       toast.success("Your donation is successful !")
-      form.reset(emptyValues(getReceiptNo({ receiptNo: values.receiptNo }), values.payment))
+      form.reset(emptyValues(getReceiptNo({ receiptNo: values.receiptNo })))
       form.setFocus("name")
     } catch (err) {
       toast.error(err instanceof Error ? err.message : "Something went wrong")
@@ -87,11 +80,11 @@ export default function DonatePage() {
         <DecorativePattern className="text-primary opacity-[0.16] dark:opacity-[0.22]" />
         <CardContent className="relative space-y-2 text-center">
           <h1 className="font-hero text-xl leading-tight tracking-wide text-balance sm:text-2xl md:text-3xl">
-            <span className="text-gradient-hero">।। श्री ढुंढिराज टेंबे गणेश मंडळ ।।</span>
+            <span className="text-gradient-hero">॥ श्री ढुंढिराज टेंबे गणेश मंडळ ॥</span>
           </h1>
           <p className="font-devanagari mx-auto max-w-3xl text-xs leading-relaxed text-foreground/80 sm:text-sm">
-            एकदंतं चतुर्हस्तं पाशमंकुशधारिणम। रदं च वरदं हस्तैर्विभ्राणं मूषकध्वजम। रक्तं लंबोदरं शूर्पकर्णकं
-            रक्तवाससम। रक्तगंधाऽनुलिप्तांगं रक्तपुष्पै: सुपुजितम।।
+            एकदंतं चतुर्हस्तं पाशमंकुशधारिणम्। रदं च वरदं हस्तैर्विभ्राणं मूषकध्वजम्। रक्तं लंबोदरं शूर्पकर्णकं
+            रक्तवाससम्। रक्तगन्धानुलिप्तांगं रक्तपुष्पै: सुपुजितम्।।
             <br />
             भक्तानुकंपिनं देवं जगत्कारणमच्युतम । आविर्भूतं च सृष्टयादौ प्रकृते पुरुषात्परम । एवं ध्यायति यो
             नित्यं स योगी योगिनां वर:।।
@@ -120,9 +113,7 @@ export default function DonatePage() {
                     <Button
                       type="button"
                       variant="outline"
-                      onClick={() =>
-                        form.reset(emptyValues(form.getValues("receiptNo"), form.getValues("payment")))
-                      }
+                      onClick={() => form.reset(emptyValues(form.getValues("receiptNo")))}
                     >
                       Reset
                     </Button>
